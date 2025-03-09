@@ -62,48 +62,51 @@ def detect_saranghae(landmarks):
 st.title("Hand Gesture Recognition 👋")
 st.write("Detect peace sign ✌️, thumbs up 👍, and Saranghae heart ❤️ gestures!")
 
+# Add a start/stop button
+run = st.checkbox('Start Camera')
+
 # Create a placeholder for the webcam feed
 frame_placeholder = st.empty()
 
-# Add a stop button
-stop_button = st.button("Stop")
+if run:
+    # Start webcam
+    cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        st.error("Could not open camera. Please check your camera connection.")
+    else:
+        try:
+            while run:
+                ret, frame = cap.read()
+                if not ret:
+                    st.error("Failed to grab frame")
+                    break
 
-# Start webcam
-cap = cv2.VideoCapture(0)
+                # Flip the frame horizontally for selfie-view
+                frame = cv2.flip(frame, 1)
 
-try:
-    while cap.isOpened() and not stop_button:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("Failed to grab frame")
-            break
+                # Convert BGR to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = hands.process(frame_rgb)
 
-        # Flip the frame horizontally for a later selfie-view display
-        frame = cv2.flip(frame, 1)
+                # Detect and display gestures
+                if results.multi_hand_landmarks:
+                    for hand_landmarks in results.multi_hand_landmarks:
+                        mp_draw.draw_landmarks(frame_rgb, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                        landmarks = {i: (lm.x, lm.y) for i, lm in enumerate(hand_landmarks.landmark)}
 
-        # Convert BGR to RGB
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = hands.process(frame_rgb)
+                        if detect_peace_sign(landmarks):
+                            cv2.putText(frame_rgb, "Peace ✌️", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+                        elif detect_thumbs_up(landmarks):
+                            cv2.putText(frame_rgb, "Thumbs Up 👍", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
+                        elif detect_saranghae(landmarks):
+                            cv2.putText(frame_rgb, "Saranghae ❤️", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 3)
 
-        # Detect and display gestures
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                mp_draw.draw_landmarks(frame_rgb, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-                landmarks = {i: (lm.x, lm.y) for i, lm in enumerate(hand_landmarks.landmark)}
+                # Display the frame
+                frame_placeholder.image(frame_rgb, channels="RGB")
 
-                if detect_peace_sign(landmarks):
-                    cv2.putText(frame_rgb, "Peace ✌️", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-
-                elif detect_thumbs_up(landmarks):
-                    cv2.putText(frame_rgb, "Thumbs Up 👍", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
-
-                elif detect_saranghae(landmarks):
-                    cv2.putText(frame_rgb, "Saranghae ❤️", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 3)
-
-        # Display the frame
-        frame_placeholder.image(frame_rgb, channels="RGB")
-
-finally:
-    # Clean up
-    cap.release()
-    st.write("Camera stopped")
+        finally:
+            cap.release()
+            st.write("Camera stopped")
+else:
+    st.write("Click 'Start Camera' to begin")
