@@ -1,16 +1,13 @@
-import streamlit as st
-try:
-    import cv2
-    import mediapipe as mp
-    import numpy as np
-except ImportError:
-    st.error("Error loading dependencies. Please check requirements.txt")
-    st.stop()
+import cv2
+import mediapipe as mp
 
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.7)
 mp_draw = mp.solutions.drawing_utils
+
+# Start webcam
+cap = cv2.VideoCapture(0)
 
 # Function to detect peace sign ✌
 def detect_peace_sign(landmarks):
@@ -58,55 +55,49 @@ def detect_saranghae(landmarks):
 
     return thumb_index_close and middle_curled and ring_curled and pinky_curled
 
-# Streamlit UI
-st.title("Hand Gesture Recognition 👋")
-st.write("Detect peace sign ✌️, thumbs up 👍, and Saranghae heart ❤️ gestures!")
+print("Starting camera feed... Press 'q' to quit")
 
-# Add a start/stop button
-run = st.checkbox('Start Camera')
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame")
+        break
 
-# Create a placeholder for the webcam feed
-frame_placeholder = st.empty()
+    # Convert BGR to RGB
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = hands.process(frame_rgb)
 
-if run:
-    # Start webcam
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        st.error("Could not open camera. Please check your camera connection.")
-    else:
-        try:
-            while run:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Failed to grab frame")
-                    break
+    # Detect and display gestures
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            landmarks = {i: (lm.x, lm.y) for i, lm in enumerate(hand_landmarks.landmark)}
 
-                # Flip the frame horizontally for selfie-view
-                frame = cv2.flip(frame, 1)
+            if detect_peace_sign(landmarks):
+                cv2.putText(frame, "Peace", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
 
-                # Convert BGR to RGB
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results = hands.process(frame_rgb)
+            elif detect_thumbs_up(landmarks):
+                cv2.putText(frame, "Thumbs Up", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
 
-                # Detect and display gestures
-                if results.multi_hand_landmarks:
-                    for hand_landmarks in results.multi_hand_landmarks:
-                        mp_draw.draw_landmarks(frame_rgb, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-                        landmarks = {i: (lm.x, lm.y) for i, lm in enumerate(hand_landmarks.landmark)}
+            elif detect_saranghae(landmarks):
+                cv2.putText(frame, "Saranghae", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 3)
 
-                        if detect_peace_sign(landmarks):
-                            cv2.putText(frame_rgb, "Peace ✌️", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                        elif detect_thumbs_up(landmarks):
-                            cv2.putText(frame_rgb, "Thumbs Up 👍", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
-                        elif detect_saranghae(landmarks):
-                            cv2.putText(frame_rgb, "Saranghae ❤️", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 3)
+    # Display Output
+    try:
+        frame = cv2.resize(frame, (640, 480))  # Add fixed size
+        cv2.namedWindow("Hand Gesture Recognition", cv2.WINDOW_NORMAL)
+        cv2.imshow("Hand Gesture Recognition", frame)
+    except Exception as e:
+        print(f"Display error: {e}")
+        break
 
-                # Display the frame
-                frame_placeholder.image(frame_rgb, channels="RGB")
+    # Break the loop if 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-        finally:
-            cap.release()
-            st.write("Camera stopped")
-else:
-    st.write("Click 'Start Camera' to begin")
+# Clean up
+try:
+    cap.release()
+    cv2.destroyAllWindows()
+except:
+    pass
