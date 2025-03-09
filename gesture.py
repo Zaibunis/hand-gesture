@@ -1,6 +1,11 @@
-import cv2
-import mediapipe as mp
 import streamlit as st
+try:
+    import cv2
+    import mediapipe as mp
+    import numpy as np
+except ImportError:
+    st.error("Error loading dependencies. Please check requirements.txt")
+    st.stop()
 
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
